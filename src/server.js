@@ -2,27 +2,68 @@ import express from "express";
 import { callAPI } from "./apiCaller.js";
 
 const app = express();
-const port = 3000;
 
-app.get("/api", async (req, res) => {
-  const { licensePlate } = req.query;
+// ✅ BẮT BUỘC dùng PORT của Render
+const PORT = process.env.PORT || 3000;
 
-  if (!licensePlate) {
-    return res.status(400).json({ error: "License plate is required" });
+/**
+ * Health check (Render gọi route này)
+ */
+app.get("/", (req, res) => {
+  res.send("phatnguoi-api is running");
+});
+
+/**
+ * API tra phạt nguội
+ * Ví dụ:
+ * /api/phatnguoi?bienso=50H71829&loaixe=oto
+ */
+app.get("/api/phatnguoi", async (req, res) => {
+  const { bienso } = req.query;
+
+  if (!bienso) {
+    return res.status(400).json({
+      status: "error",
+      message: "Thiếu tham số bienso",
+    });
   }
 
   try {
-    const violations = await callAPI(licensePlate);
-    if (violations) {
-      res.json({ licensePlate, violations });
-    } else {
-      res.status(404).json({ error: "No violations found" });
+    const violations = await callAPI(bienso);
+
+    if (!violations || violations.length === 0) {
+      return res.json({
+        status: "success",
+        data: {
+          bienSo: bienso,
+          ketQua: "Không phát hiện vi phạm",
+          danhSach: [],
+          lastUpdate: new Date().toISOString(),
+        },
+      });
     }
+
+    return res.json({
+      status: "success",
+      data: {
+        bienSo: bienso,
+        ketQua: "Có vi phạm",
+        danhSach: violations,
+        lastUpdate: new Date().toISOString(),
+      },
+    });
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error(error);
+    return res.status(500).json({
+      status: "error",
+      message: error.message,
+    });
   }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+/**
+ * Start server
+ */
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
