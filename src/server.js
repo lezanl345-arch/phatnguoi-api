@@ -2,24 +2,28 @@ import express from "express";
 import { callAPI } from "./apiCaller.js";
 
 const app = express();
-
-// ✅ BẮT BUỘC dùng PORT của Render
 const PORT = process.env.PORT || 3000;
 
 /**
- * Health check (Render gọi route này)
+ * Render health check
  */
 app.get("/", (req, res) => {
-  res.send("phatnguoi-api is running");
+  res.status(200).send("OK - phatnguoi api running");
+});
+
+/**
+ * Log tất cả request (DEBUG)
+ */
+app.use((req, res, next) => {
+  console.log("➡️ Incoming:", req.method, req.originalUrl);
+  next();
 });
 
 /**
  * API tra phạt nguội
- * Ví dụ:
- * /api/phatnguoi?bienso=50H71829&loaixe=oto
  */
 app.get("/api/phatnguoi", async (req, res) => {
-  const { bienso } = req.query;
+  const bienso = req.query.bienso || req.query.licensePlate;
 
   if (!bienso) {
     return res.status(400).json({
@@ -31,39 +35,38 @@ app.get("/api/phatnguoi", async (req, res) => {
   try {
     const violations = await callAPI(bienso);
 
-    if (!violations || violations.length === 0) {
-      return res.json({
-        status: "success",
-        data: {
-          bienSo: bienso,
-          ketQua: "Không phát hiện vi phạm",
-          danhSach: [],
-          lastUpdate: new Date().toISOString(),
-        },
-      });
-    }
-
     return res.json({
       status: "success",
       data: {
         bienSo: bienso,
-        ketQua: "Có vi phạm",
-        danhSach: violations,
+        ketQua:
+          !violations || violations.length === 0
+            ? "Không phát hiện vi phạm"
+            : "Có vi phạm",
+        danhSach: violations || [],
         lastUpdate: new Date().toISOString(),
       },
     });
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error("❌ Error:", err);
     return res.status(500).json({
       status: "error",
-      message: error.message,
+      message: err.message,
     });
   }
 });
 
 /**
- * Start server
+ * Catch-all (để Render không nuốt request)
  */
+app.use((req, res) => {
+  res.status(404).json({
+    status: "error",
+    message: "Route not found",
+    path: req.originalUrl,
+  });
+});
+
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🚀 Server listening on port ${PORT}`);
 });
